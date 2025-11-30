@@ -1,0 +1,17 @@
+{
+  "name": "stress-testing-tool",
+  "version": "1.0.0",
+  "description": "Website stress testing tool with CORS proxy",
+  "main": "proxy-server.js",
+  "scripts": {
+    "start": "node proxy-server.js",
+    "proxy": "node proxy-server.js"
+  },
+  "keywords": [
+    "stress-testing",
+    "load-testing",
+    "cors-proxy"
+  ],
+  "author": "",
+  "license": "MIT"
+}
