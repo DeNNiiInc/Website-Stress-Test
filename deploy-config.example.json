@@ -1,0 +1,9 @@
+{
+  "host": "YOUR_SERVER_IP",
+  "username": "root",
+  "password": "YOUR_SSH_PASSWORD",
+  "remotePath": "/var/www/website-stress-test",
+  "repoUrl": "https://github.com/DeNNiiInc/Website-Stress-Test.git",
+  "githubToken": "YOUR_GITHUB_TOKEN",
+  "appName": "website-stress-test"
+}
