@@ -68,7 +68,8 @@ const server = http.createServer((req, res) => {
     }
 
     // Handle Git Info request
-    if (req.url === '/git-info' && req.method === 'GET') {
+    // Nginx proxy_pass might result in double slashes (//git-info)
+    if ((req.url === '/git-info' || req.url === '//git-info') && req.method === 'GET') {
         handleCORS(res);
         getGitInfo().then(info => {
             res.writeHead(200, { 'Content-Type': 'application/json' });
