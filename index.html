@@ -1,396 +1,512 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description"
-        content="Professional stress testing tool for simulating realistic traffic to production websites">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Professional stress testing tool for simulating realistic traffic to production websites"
+    />
     <title>Beyond Cloud Technology - Website Stress Test</title>
-    <link rel="icon" type="image/png" href="Logo.png">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="Logo.png" />
+    <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <h1 class="title">
-                    <img src="Logo.png" alt="BCT Logo" class="title-icon">
-                    Beyond Cloud Technology - Website Stress Test
-                </h1>
-                <p class="subtitle">Simulate realistic traffic patterns to test your production websites</p>
-                <a href="https://www.youtube.com/@beyondcloudtechnology" target="_blank" rel="noopener noreferrer"
-                    class="youtube-link">
-                    <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                    </svg>
-                    Watch on YouTube @beyondcloudtechnology
-                </a>
-            </div>
-            <div class="header-controls">
-                <button type="button" class="btn btn-secondary btn-sm" id="themeToggle" title="Toggle Theme">
-                    🌓 Theme
-                </button>
-            </div>
-        </header>
+      <!-- Header -->
+      <header class="header">
+        <div class="header-content">
+          <h1 class="title">
+            <img src="Logo.png" alt="BCT Logo" class="title-icon" />
+            Beyond Cloud Technology - Website Stress Test
+          </h1>
+          <p class="subtitle">
+            Simulate realistic traffic patterns to test your production websites
+          </p>
+          <a
+            href="https://www.youtube.com/@beyondcloudtechnology"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="youtube-link"
+          >
+            <svg class="youtube-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"
+              />
+            </svg>
+            Watch on YouTube @beyondcloudtechnology
+          </a>
+        </div>
+        <div class="header-controls">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            id="themeToggle"
+            title="Toggle Theme"
+          >
+            🌓 Theme
+          </button>
+        </div>
+      </header>
 
-        <!-- Test Presets -->
-        <div class="panel full-width">
-            <div class="panel-header">
-                <div class="panel-icon">⚡</div>
-                <h2 class="panel-title">Quick Start</h2>
+      <!-- Test Presets -->
+      <div class="panel full-width">
+        <div class="panel-header">
+          <div class="panel-icon">⚡</div>
+          <h2 class="panel-title">Quick Start</h2>
+        </div>
+        <div class="preset-controls">
+          <select id="presetSelect" class="form-select">
+            <option value="">Select a preset...</option>
+            <option value="light">🟢 Light Load (10 users, 30s)</option>
+            <option value="medium">🟡 Medium Load (100 users, 60s)</option>
+            <option value="heavy">🔴 Heavy Load (500 users, 120s)</option>
+            <option value="spike">💥 Spike Test (200 users, burst)</option>
+          </select>
+          <button type="button" class="btn btn-secondary" id="saveConfigBtn">
+            💾 Save Current Config
+          </button>
+        </div>
+        <div class="keyboard-shortcuts">
+          <small
+            ><strong>Keyboard Shortcuts:</strong> S = Start | P = Pause/Resume |
+            X = Stop</small
+          >
+        </div>
+      </div>
+
+      <!-- Main Grid -->
+      <div class="main-grid">
+        <!-- Configuration Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-icon">⚙️</div>
+            <h2 class="panel-title">Configuration</h2>
+          </div>
+
+          <form id="configForm">
+            <!-- Target URL -->
+            <div class="form-group">
+              <label class="form-label" for="targetUrl">Target URL</label>
+              <input
+                type="url"
+                id="targetUrl"
+                class="form-input"
+                placeholder="https://example.com"
+                required
+              />
             </div>
-            <div class="preset-controls">
-                <select id="presetSelect" class="form-select">
-                    <option value="">Select a preset...</option>
-                    <option value="light">🟢 Light Load (10 users, 30s)</option>
-                    <option value="medium">🟡 Medium Load (100 users, 60s)</option>
-                    <option value="heavy">🔴 Heavy Load (500 users, 120s)</option>
-                    <option value="spike">💥 Spike Test (200 users, burst)</option>
-                </select>
-                <button type="button" class="btn btn-secondary" id="saveConfigBtn">💾 Save Current Config</button>
+
+            <!-- Number of Users -->
+            <div class="form-group">
+              <label class="form-label" for="userCount">
+                Concurrent Users
+                <span class="range-value" id="userCountValue">100</span>
+              </label>
+              <input
+                type="range"
+                id="userCount"
+                class="form-range"
+                min="1"
+                max="5000"
+                value="100"
+              />
             </div>
-            <div class="keyboard-shortcuts">
-                <small><strong>Keyboard Shortcuts:</strong> S = Start | P = Pause/Resume | X = Stop</small>
+
+            <!-- Test Duration -->
+            <div class="form-group">
+              <label class="form-label" for="duration">
+                Duration (seconds)
+                <span class="range-value" id="durationValue">60</span>
+              </label>
+              <input
+                type="range"
+                id="duration"
+                class="form-range"
+                min="10"
+                max="600"
+                value="60"
+                step="10"
+              />
             </div>
+
+            <!-- Traffic Pattern -->
+            <div class="form-group">
+              <label class="form-label" for="trafficPattern"
+                >Traffic Pattern</label
+              >
+              <select id="trafficPattern" class="form-select">
+                <option value="steady">Steady Load (Constant RPS)</option>
+                <option value="burst">Burst Mode (Traffic Spikes)</option>
+                <option value="rampup">Ramp-Up (Gradual Increase)</option>
+                <option value="random">Random (Realistic Users)</option>
+              </select>
+            </div>
+
+            <!-- Crawler Mode -->
+            <div class="form-group crawler-section">
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  id="crawlerEnabled"
+                  class="form-checkbox"
+                />
+                <span>🕷️ Enable Crawler Mode (Simulate Real Users)</span>
+              </label>
+              <small class="help-text"
+                >Randomly navigate through website links like real users</small
+              >
+            </div>
+
+            <!-- Crawler Settings (shown when enabled) -->
+            <div
+              class="crawler-settings"
+              id="crawlerSettings"
+              style="display: none"
+            >
+              <div class="form-group">
+                <label class="form-label" for="crawlDepth">
+                  Crawl Depth
+                  <span class="range-value" id="crawlDepthValue">2</span>
+                </label>
+                <input
+                  type="range"
+                  id="crawlDepth"
+                  class="form-range"
+                  min="1"
+                  max="5"
+                  value="2"
+                />
+                <small class="help-text"
+                  >Maximum number of page hops per user</small
+                >
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="linksPerPage">
+                  Links Per Page
+                  <span class="range-value" id="linksPerPageValue">10</span>
+                </label>
+                <input
+                  type="range"
+                  id="linksPerPage"
+                  class="form-range"
+                  min="1"
+                  max="50"
+                  value="10"
+                />
+                <small class="help-text"
+                  >Maximum links to extract from each page</small
+                >
+              </div>
+            </div>
+
+            <!-- Advanced Options Accordion -->
+            <div class="accordion">
+              <button
+                type="button"
+                class="accordion-header"
+                id="advancedToggle"
+              >
+                <span>Advanced Options</span>
+                <span class="accordion-icon">▼</span>
+              </button>
+              <div class="accordion-content" id="advancedContent">
+                <!-- HTTP Method -->
+                <div class="form-group">
+                  <label class="form-label" for="httpMethod">HTTP Method</label>
+                  <select id="httpMethod" class="form-select">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="PATCH">PATCH</option>
+                  </select>
+                </div>
+
+                <!-- Request Headers -->
+                <div class="form-group">
+                  <label class="form-label" for="customHeaders"
+                    >Custom Headers (JSON)</label
+                  >
+                  <textarea
+                    id="customHeaders"
+                    class="form-textarea"
+                    placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'
+                  ></textarea>
+                </div>
+
+                <!-- Request Body -->
+                <div class="form-group">
+                  <label class="form-label" for="requestBody"
+                    >Request Body (JSON)</label
+                  >
+                  <textarea
+                    id="requestBody"
+                    class="form-textarea"
+                    placeholder='{"key": "value"}'
+                  ></textarea>
+                </div>
+
+                <!-- Think Time -->
+                <div class="form-group">
+                  <label class="form-label" for="thinkTime">
+                    Think Time (ms)
+                    <span class="range-value" id="thinkTimeValue">1000</span>
+                  </label>
+                  <input
+                    type="range"
+                    id="thinkTime"
+                    class="form-range"
+                    min="0"
+                    max="5000"
+                    value="1000"
+                    step="100"
+                  />
+                  <small class="help-text"
+                    >Delay between requests per user</small
+                  >
+                </div>
+              </div>
+            </div>
+          </form>
         </div>
 
-        <!-- Main Grid -->
-        <div class="main-grid">
-            <!-- Configuration Panel -->
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="panel-icon">⚙️</div>
-                    <h2 class="panel-title">Configuration</h2>
-                </div>
+        <!-- Control Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-icon">🎮</div>
+            <h2 class="panel-title">Control Panel</h2>
+          </div>
 
-                <form id="configForm">
-                    <!-- Target URL -->
-                    <div class="form-group">
-                        <label class="form-label" for="targetUrl">Target URL</label>
-                        <input type="url" id="targetUrl" class="form-input" placeholder="https://example.com" required>
-                    </div>
+          <!-- Status Badge -->
+          <div class="text-center mb-3">
+            <span class="status-badge status-idle" id="statusBadge">Idle</span>
+          </div>
 
-                    <!-- Number of Users -->
-                    <div class="form-group">
-                        <label class="form-label" for="userCount">
-                            Concurrent Users
-                            <span class="range-value" id="userCountValue">100</span>
-                        </label>
-                        <input type="range" id="userCount" class="form-range" min="1" max="5000" value="100">
-                    </div>
+          <!-- Progress Bar -->
+          <div class="progress-container">
+            <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+          </div>
 
-                    <!-- Test Duration -->
-                    <div class="form-group">
-                        <label class="form-label" for="duration">
-                            Duration (seconds)
-                            <span class="range-value" id="durationValue">60</span>
-                        </label>
-                        <input type="range" id="duration" class="form-range" min="10" max="600" value="60" step="10">
-                    </div>
+          <!-- Control Buttons -->
+          <div class="btn-group mt-4">
+            <button type="button" class="btn btn-success" id="startBtn">
+              ▶️ Start Test
+            </button>
+            <button
+              type="button"
+              class="btn btn-warning"
+              id="pauseBtn"
+              disabled
+            >
+              ⏸️ Pause
+            </button>
+            <button type="button" class="btn btn-danger" id="stopBtn" disabled>
+              ⏹️ Stop
+            </button>
+          </div>
 
-                    <!-- Traffic Pattern -->
-                    <div class="form-group">
-                        <label class="form-label" for="trafficPattern">Traffic Pattern</label>
-                        <select id="trafficPattern" class="form-select">
-                            <option value="steady">Steady Load (Constant RPS)</option>
-                            <option value="burst">Burst Mode (Traffic Spikes)</option>
-                            <option value="rampup">Ramp-Up (Gradual Increase)</option>
-                            <option value="random">Random (Realistic Users)</option>
-                        </select>
-                    </div>
-
-                    <!-- Crawler Mode -->
-                    <div class="form-group crawler-section">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="crawlerEnabled" class="form-checkbox">
-                            <span>🕷️ Enable Crawler Mode (Simulate Real Users)</span>
-                        </label>
-                        <small class="help-text">Randomly navigate through website links like real users</small>
-                    </div>
-
-                    <!-- Crawler Settings (shown when enabled) -->
-                    <div class="crawler-settings" id="crawlerSettings" style="display: none;">
-                        <div class="form-group">
-                            <label class="form-label" for="crawlDepth">
-                                Crawl Depth
-                                <span class="range-value" id="crawlDepthValue">2</span>
-                            </label>
-                            <input type="range" id="crawlDepth" class="form-range" min="1" max="5" value="2">
-                            <small class="help-text">Maximum number of page hops per user</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="linksPerPage">
-                                Links Per Page
-                                <span class="range-value" id="linksPerPageValue">10</span>
-                            </label>
-                            <input type="range" id="linksPerPage" class="form-range" min="1" max="50" value="10">
-                            <small class="help-text">Maximum links to extract from each page</small>
-                        </div>
-                    </div>
-
-                    <!-- Advanced Options Accordion -->
-                    <div class="accordion">
-                        <button type="button" class="accordion-header" id="advancedToggle">
-                            <span>Advanced Options</span>
-                            <span class="accordion-icon">▼</span>
-                        </button>
-                        <div class="accordion-content" id="advancedContent">
-                            <!-- HTTP Method -->
-                            <div class="form-group">
-                                <label class="form-label" for="httpMethod">HTTP Method</label>
-                                <select id="httpMethod" class="form-select">
-                                    <option value="GET">GET</option>
-                                    <option value="POST">POST</option>
-                                    <option value="PUT">PUT</option>
-                                    <option value="DELETE">DELETE</option>
-                                    <option value="PATCH">PATCH</option>
-                                </select>
-                            </div>
-
-                            <!-- Request Headers -->
-                            <div class="form-group">
-                                <label class="form-label" for="customHeaders">Custom Headers (JSON)</label>
-                                <textarea id="customHeaders" class="form-textarea"
-                                    placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'></textarea>
-                            </div>
-
-                            <!-- Request Body -->
-                            <div class="form-group">
-                                <label class="form-label" for="requestBody">Request Body (JSON)</label>
-                                <textarea id="requestBody" class="form-textarea"
-                                    placeholder='{"key": "value"}'></textarea>
-                            </div>
-
-                            <!-- Think Time -->
-                            <div class="form-group">
-                                <label class="form-label" for="thinkTime">
-                                    Think Time (ms)
-                                    <span class="range-value" id="thinkTimeValue">1000</span>
-                                </label>
-                                <input type="range" id="thinkTime" class="form-range" min="0" max="5000" value="1000"
-                                    step="100">
-                                <small class="help-text">Delay between requests per user</small>
-                            </div>
-                        </div>
-                    </div>
-                </form>
+          <!-- Quick Stats -->
+          <div class="stats-grid mt-4">
+            <div class="stat-card">
+              <div class="stat-label">Elapsed Time</div>
+              <div class="stat-value" id="elapsedTime">0s</div>
             </div>
-
-            <!-- Control Panel -->
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="panel-icon">🎮</div>
-                    <h2 class="panel-title">Control Panel</h2>
-                </div>
-
-                <!-- Status Badge -->
-                <div class="text-center mb-3">
-                    <span class="status-badge status-idle" id="statusBadge">Idle</span>
-                </div>
-
-                <!-- Progress Bar -->
-                <div class="progress-container">
-                    <div class="progress-bar" id="progressBar" style="width: 0%"></div>
-                </div>
-
-                <!-- Control Buttons -->
-                <div class="btn-group mt-4">
-                    <button type="button" class="btn btn-success" id="startBtn">▶️ Start Test</button>
-                    <button type="button" class="btn btn-warning" id="pauseBtn" disabled>⏸️ Pause</button>
-                    <button type="button" class="btn btn-danger" id="stopBtn" disabled>⏹️ Stop</button>
-                </div>
-
-                <!-- Quick Stats -->
-                <div class="stats-grid mt-4">
-                    <div class="stat-card">
-                        <div class="stat-label">Elapsed Time</div>
-                        <div class="stat-value" id="elapsedTime">0s</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Remaining</div>
-                        <div class="stat-value" id="remainingTime">0s</div>
-                    </div>
-                </div>
+            <div class="stat-card">
+              <div class="stat-label">Remaining</div>
+              <div class="stat-value" id="remainingTime">0s</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Statistics -->
+      <div class="panel full-width">
+        <div class="panel-header">
+          <div class="panel-icon">📊</div>
+          <h2 class="panel-title">Live Statistics</h2>
         </div>
 
-        <!-- Live Statistics -->
-        <div class="panel full-width">
-            <div class="panel-header">
-                <div class="panel-icon">📊</div>
-                <h2 class="panel-title">Live Statistics</h2>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-label">Active Users</div>
-                    <div class="stat-value info" id="activeUsers">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Total Requests</div>
-                    <div class="stat-value" id="totalRequests">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Requests/Sec</div>
-                    <div class="stat-value info" id="requestsPerSec">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Success Rate</div>
-                    <div class="stat-value success" id="successRate">0%</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Failed Requests</div>
-                    <div class="stat-value danger" id="failedRequests">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Avg Response Time</div>
-                    <div class="stat-value warning" id="avgResponseTime">0ms</div>
-                </div>
-            </div>
-
-            <!-- Percentile Metrics -->
-            <div class="panel-section mt-4">
-                <h3 class="section-title">Response Time Percentiles</h3>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">P50 (Median)</div>
-                        <div class="stat-value info" id="p50ResponseTime">0ms</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">P95</div>
-                        <div class="stat-value warning" id="p95ResponseTime">0ms</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">P99</div>
-                        <div class="stat-value danger" id="p99ResponseTime">0ms</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Error Breakdown -->
-            <div class="panel-section mt-4">
-                <h3 class="section-title">Error Breakdown</h3>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">4xx Errors</div>
-                        <div class="stat-value warning" id="errors4xx">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">5xx Errors</div>
-                        <div class="stat-value danger" id="errors5xx">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Timeout Errors</div>
-                        <div class="stat-value danger" id="errorsTimeout">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Network Errors</div>
-                        <div class="stat-value danger" id="errorsNetwork">0</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bandwidth -->
-            <div class="panel-section mt-4">
-                <h3 class="section-title">Bandwidth Usage</h3>
-                <div class="stat-card-large">
-                    <div class="stat-label">Total Bandwidth</div>
-                    <div class="stat-value info" id="totalBandwidth">0 B</div>
-                </div>
-            </div>
-
-            <!-- Charts -->
-            <div class="main-grid mt-4">
-                <div class="chart-container">
-                    <canvas id="rpsChart"></canvas>
-                </div>
-                <div class="chart-container">
-                    <canvas id="responseTimeChart"></canvas>
-                </div>
-            </div>
-
-            <!-- User/Error Correlation Chart (Full Width) -->
-            <div class="chart-container" style="height: 350px; margin-top: var(--spacing-lg);">
-                <canvas id="userErrorChart"></canvas>
-            </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Active Users</div>
+            <div class="stat-value info" id="activeUsers">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Requests</div>
+            <div class="stat-value" id="totalRequests">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Requests/Sec</div>
+            <div class="stat-value info" id="requestsPerSec">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Success Rate</div>
+            <div class="stat-value success" id="successRate">0%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Failed Requests</div>
+            <div class="stat-value danger" id="failedRequests">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg Response Time</div>
+            <div class="stat-value warning" id="avgResponseTime">0ms</div>
+          </div>
         </div>
 
-        <!-- Request History Log -->
-        <div class="panel full-width">
-            <div class="panel-header">
-                <div class="panel-icon">📝</div>
-                <h2 class="panel-title">Request History (Last 100)</h2>
+        <!-- Percentile Metrics -->
+        <div class="panel-section mt-4">
+          <h3 class="section-title">Response Time Percentiles</h3>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">P50 (Median)</div>
+              <div class="stat-value info" id="p50ResponseTime">0ms</div>
             </div>
-
-            <div class="request-history-container">
-                <table class="request-history-table">
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>URL</th>
-                            <th>Status</th>
-                            <th>Response Time</th>
-                        </tr>
-                    </thead>
-                    <tbody id="requestHistoryBody">
-                        <!-- Populated dynamically -->
-                    </tbody>
-                </table>
+            <div class="stat-card">
+              <div class="stat-label">P95</div>
+              <div class="stat-value warning" id="p95ResponseTime">0ms</div>
             </div>
+            <div class="stat-card">
+              <div class="stat-label">P99</div>
+              <div class="stat-value danger" id="p99ResponseTime">0ms</div>
+            </div>
+          </div>
         </div>
 
-        <!-- Results Panel -->
-        <div class="panel full-width" id="resultsPanel" style="display: none;">
-            <div class="panel-header">
-                <div class="panel-icon">📈</div>
-                <h2 class="panel-title">Test Results</h2>
+        <!-- Error Breakdown -->
+        <div class="panel-section mt-4">
+          <h3 class="section-title">Error Breakdown</h3>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">4xx Errors</div>
+              <div class="stat-value warning" id="errors4xx">0</div>
             </div>
-
-            <div class="btn-group mb-3">
-                <button type="button" class="btn btn-primary" id="exportJsonBtn">💾 Export as JSON</button>
-                <button type="button" class="btn btn-primary" id="exportCsvBtn">📄 Export as CSV</button>
+            <div class="stat-card">
+              <div class="stat-label">5xx Errors</div>
+              <div class="stat-value danger" id="errors5xx">0</div>
             </div>
-
-            <table class="results-table">
-                <thead>
-                    <tr>
-                        <th>Metric</th>
-                        <th>Value</th>
-                    </tr>
-                </thead>
-                <tbody id="resultsTableBody">
-                    <!-- Results will be populated here -->
-                </tbody>
-            </table>
-
-            <div id="detailedResults" class="mt-4"></div>
+            <div class="stat-card">
+              <div class="stat-label">Timeout Errors</div>
+              <div class="stat-value danger" id="errorsTimeout">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Network Errors</div>
+              <div class="stat-value danger" id="errorsNetwork">0</div>
+            </div>
+          </div>
         </div>
+
+        <!-- Bandwidth -->
+        <div class="panel-section mt-4">
+          <h3 class="section-title">Bandwidth Usage</h3>
+          <div class="stat-card-large">
+            <div class="stat-label">Total Bandwidth</div>
+            <div class="stat-value info" id="totalBandwidth">0 B</div>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="main-grid mt-4">
+          <div class="chart-container">
+            <canvas id="rpsChart"></canvas>
+          </div>
+          <div class="chart-container">
+            <canvas id="responseTimeChart"></canvas>
+          </div>
+        </div>
+
+        <!-- User/Error Correlation Chart (Full Width) -->
+        <div
+          class="chart-container"
+          style="height: 350px; margin-top: var(--spacing-lg)"
+        >
+          <canvas id="userErrorChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Request History Log -->
+      <div class="panel full-width">
+        <div class="panel-header">
+          <div class="panel-icon">📝</div>
+          <h2 class="panel-title">Request History (Last 100)</h2>
+        </div>
+
+        <div class="request-history-container">
+          <table class="request-history-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>URL</th>
+                <th>Status</th>
+                <th>Response Time</th>
+              </tr>
+            </thead>
+            <tbody id="requestHistoryBody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Results Panel -->
+      <div class="panel full-width" id="resultsPanel" style="display: none">
+        <div class="panel-header">
+          <div class="panel-icon">📈</div>
+          <h2 class="panel-title">Test Results</h2>
+        </div>
+
+        <div class="btn-group mb-3">
+          <button type="button" class="btn btn-primary" id="exportJsonBtn">
+            💾 Export as JSON
+          </button>
+          <button type="button" class="btn btn-primary" id="exportCsvBtn">
+            📄 Export as CSV
+          </button>
+        </div>
+
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="resultsTableBody">
+            <!-- Results will be populated here -->
+          </tbody>
+        </table>
+
+        <div id="detailedResults" class="mt-4"></div>
+      </div>
     </div>
 
     <footer class="footer">
-        <p>&copy; 2025 Beyond Cloud Technology. All rights reserved.</p>
+      <p>&copy; 2025 Beyond Cloud Technology. All rights reserved.</p>
     </footer>
+
+    <!-- Git Commit Info -->
+    <div id="gitInfo" class="git-info-pill" style="display: none">
+      <span class="git-commit" id="gitCommit"></span>
+      <span class="git-separator">•</span>
+      <span class="git-date" id="gitDate"></span>
+    </div>
 
     <script src="script.js"></script>
     <script>
-        // Show/hide crawler settings based on checkbox
-        document.addEventListener('DOMContentLoaded', () => {
-            const crawlerCheckbox = document.getElementById('crawlerEnabled');
-            const crawlerSettings = document.getElementById('crawlerSettings');
+      // Show/hide crawler settings based on checkbox
+      document.addEventListener("DOMContentLoaded", () => {
+        const crawlerCheckbox = document.getElementById("crawlerEnabled");
+        const crawlerSettings = document.getElementById("crawlerSettings");
 
-            if (crawlerCheckbox && crawlerSettings) {
-                crawlerCheckbox.addEventListener('change', (e) => {
-                    crawlerSettings.style.display = e.target.checked ? 'block' : 'none';
-                });
-            }
-        });
+        if (crawlerCheckbox && crawlerSettings) {
+          crawlerCheckbox.addEventListener("change", (e) => {
+            crawlerSettings.style.display = e.target.checked ? "block" : "none";
+          });
+        }
+      });
     </script>
-</body>
-
+  </body>
 </html>

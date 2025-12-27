@@ -37,6 +37,26 @@ function getRandomUserAgent() {
     return CONFIG.userAgents[Math.floor(Math.random() * CONFIG.userAgents.length)];
 }
 
+const { exec } = require('child_process');
+
+// Helper to get git info
+const getGitInfo = () => {
+    return new Promise((resolve) => {
+        exec('git rev-parse --short HEAD && git log -1 --format=%cd --date=relative', (err, stdout) => {
+            if (err) {
+                console.error('Error fetching git info:', err);
+                resolve({ commit: 'Unknown', date: 'Unknown' });
+                return;
+            }
+            const parts = stdout.trim().split('\n');
+            resolve({ 
+                commit: parts[0] || 'Unknown', 
+                date: parts[1] || 'Unknown' 
+            });
+        });
+    });
+};
+
 // Create the proxy server
 const server = http.createServer((req, res) => {
     // Handle CORS preflight requests
@@ -44,6 +64,16 @@ const server = http.createServer((req, res) => {
         handleCORS(res);
         res.writeHead(200);
         res.end();
+        return;
+    }
+
+    // Handle Git Info request
+    if (req.url === '/git-info' && req.method === 'GET') {
+        handleCORS(res);
+        getGitInfo().then(info => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(info));
+        });
         return;
     }
 
@@ -194,7 +224,7 @@ function handleProxyRequest(proxyRequest, clientRes) {
 // Add CORS headers to response
 function handleCORS(res) {
     res.setHeader('Access-Control-Allow-Origin', CONFIG.allowedOrigins);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 

@@ -193,6 +193,7 @@ class StressTestingTool {
     this.loadTheme();
     this.loadSavedConfigs();
     this.setupKeyboardShortcuts();
+    this.fetchGitInfo();
   }
 
   bindElements() {
@@ -261,6 +262,11 @@ class StressTestingTool {
       themeToggle: document.getElementById("themeToggle"),
       presetSelect: document.getElementById("presetSelect"),
       saveConfigBtn: document.getElementById("saveConfigBtn"),
+
+      // Git Info
+      gitInfo: document.getElementById("gitInfo"),
+      gitCommit: document.getElementById("gitCommit"),
+      gitDate: document.getElementById("gitDate"),
     };
   }
 
@@ -450,6 +456,32 @@ class StressTestingTool {
 
     alert(`Configuration "${name}" saved!`);
     location.reload(); // Reload to update preset list
+  }
+
+  async fetchGitInfo() {
+    try {
+      // Ensure we don't have double slashes if proxyUrl ends with slash (it shouldn't based on init logic)
+      const url = `${this.config.proxyUrl}/git-info`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.commit && data.date && data.commit !== 'Unknown') {
+          if (this.elements.gitCommit) this.elements.gitCommit.textContent = data.commit;
+          if (this.elements.gitDate) {
+            let dateStr = data.date;
+            // Shorten to match screenshot style (approximate)
+            dateStr = dateStr.replace(/ days? ago/, 'd ago')
+                           .replace(/ hours? ago/, 'h ago')
+                           .replace(/ minutes? ago/, 'm ago')
+                           .replace(/ seconds? ago/, 's ago');
+            this.elements.gitDate.textContent = dateStr;
+          }
+          if (this.elements.gitInfo) this.elements.gitInfo.style.display = 'flex';
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch git info:', e);
+    }
   }
 
   initializeCharts() {
