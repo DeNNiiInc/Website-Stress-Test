@@ -1057,40 +1057,45 @@ body::before {
    GIT INFO PILL
    =================================== */
 .git-info-pill {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background-color: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  padding: 8px 16px;
-  border-radius: 9999px;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: var(--shadow-md);
-  z-index: 1000;
-  backdrop-filter: blur(10px);
-  transition: all var(--transition-base);
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(10, 14, 26, 0.95); /* High opacity dark background */
+    border: 1px solid var(--color-accent-primary); /* Distinct purple border */
+    padding: 10px 20px;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: white; /* Bright text */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); /* Strong shadow */
+    z-index: 99999; /* Maximum Z-index */
+    backdrop-filter: blur(4px);
+    transition: all var(--transition-base);
+    cursor: default;
 }
 
 .git-info-pill:hover {
-  border-color: var(--color-accent-secondary);
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+    background-color: rgba(10, 14, 26, 1);
+    border-color: var(--color-accent-secondary);
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.5); /* Glow on hover */
+    transform: translateY(-2px);
 }
 
 .git-commit {
-  color: var(--color-accent-secondary);
-  font-weight: 600;
+    color: var(--color-accent-primary); /* Purple highlight */
+    font-weight: 700;
+    letter-spacing: 0.05em;
 }
 
 .git-separator {
-  color: var(--color-text-tertiary);
+    color: var(--color-text-tertiary);
+    opacity: 0.5;
 }
 
 .git-date {
-  color: var(--color-text-tertiary);
+    color: #cbd5e1; /* Lighter than muted */
+    font-weight: 500;
 }
