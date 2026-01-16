@@ -10,6 +10,9 @@ const url = require('url');
 const cluster = require('cluster');
 const numCPUs = require('os').cpus().length;
 
+const fs = require('fs');
+const path = require('path');
+
 const PORT = process.env.PORT || 3000;
 
 // Configuration
@@ -54,9 +57,9 @@ const getGitInfo = () => {
                 return;
             }
             const parts = stdout.trim().split('\n');
-            resolve({ 
-                commit: parts[0] || 'Unknown', 
-                date: parts[1] || 'Unknown' 
+            resolve({
+                commit: parts[0] || 'Unknown',
+                date: parts[1] || 'Unknown'
             });
         });
     });
@@ -110,6 +113,36 @@ if (cluster.isMaster) {
             getGitInfo().then(info => {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(info));
+            });
+            return;
+        }
+
+        // Serve static files for the UI
+        if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html' || req.url === '/script.js' || req.url.startsWith('/script.js?') || req.url === '/styles.css' || req.url === '/worker.js')) {
+            let requestPath = req.url.split('?')[0];
+            let filePath = '.' + requestPath;
+            if (requestPath === '/') filePath = './index.html';
+
+            const extname = path.extname(filePath);
+            let contentType = 'text/html';
+            switch (extname) {
+                case '.js': contentType = 'text/javascript'; break;
+                case '.css': contentType = 'text/css'; break;
+            }
+
+            fs.readFile(filePath, (error, content) => {
+                if (error) {
+                    if (error.code == 'ENOENT') {
+                        res.writeHead(404);
+                        res.end('File not found');
+                    } else {
+                        res.writeHead(500);
+                        res.end('Error loading file: ' + error.code);
+                    }
+                } else {
+                    res.writeHead(200, { 'Content-Type': contentType });
+                    res.end(content, 'utf-8');
+                }
             });
             return;
         }

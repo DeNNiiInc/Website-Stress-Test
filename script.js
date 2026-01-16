@@ -69,6 +69,7 @@ class StressTestingTool {
       userErrorData: [],
       errorThreshold: null,
       lastUiUpdate: 0,
+      visitedUrls: new Set(),
 
       // Enhanced metrics
       errorsByCategory: {
@@ -772,11 +773,8 @@ class StressTestingTool {
     this.state.requestHistory = [];
     this.state.percentiles = { p50: 0, p95: 0, p99: 0 };
 
-    // Reset crawler
-    this.crawler.reset();
-    if (this.config.crawlerEnabled) {
-      this.crawler.urlQueue.push(this.config.targetUrl);
-    }
+    // Reset state variables
+    this.state.visitedUrls.clear();
 
     // Reset charts
     this.charts.rps.data.labels = [];
@@ -842,6 +840,7 @@ class StressTestingTool {
       this.state.workerStats.set(workerId, message.data);
       this.aggregateStats();
     } else if (message.type === 'LOG') {
+      this.state.visitedUrls.add(message.data.url);
       this.addToRequestHistory(message.data);
     }
   }
@@ -1217,7 +1216,7 @@ class StressTestingTool {
     };
 
     if (this.config.crawlerEnabled) {
-      results["Unique URLs Visited"] = this.crawler.visitedUrls.size;
+      results["Unique URLs Visited"] = this.state.visitedUrls.size;
     }
 
     return results;
