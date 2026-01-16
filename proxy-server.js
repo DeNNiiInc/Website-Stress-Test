@@ -138,6 +138,7 @@ if (cluster.isMaster) {
                     const extname = path.extname(filePath).toLowerCase();
                     let contentType = 'text/html';
                     const mimeTypes = {
+                        '.html': 'text/html',
                         '.js': 'text/javascript',
                         '.css': 'text/css',
                         '.png': 'image/png',
