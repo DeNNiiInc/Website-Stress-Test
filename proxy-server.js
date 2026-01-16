@@ -7,8 +7,10 @@
 const http = require('http');
 const https = require('https');
 const url = require('url');
+const cluster = require('cluster');
+const numCPUs = require('os').cpus().length;
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Configuration
 const CONFIG = {
@@ -20,7 +22,7 @@ const CONFIG = {
     allowedOrigins: '*',
 
     // Maximum concurrent connections
-    maxConnections: 5000,
+    maxConnections: 10000, // Increased for cluster
 
     // User agents for rotation
     userAgents: [
@@ -31,6 +33,10 @@ const CONFIG = {
         'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     ]
 };
+
+// Global agents for connection pooling
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: Infinity });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: Infinity });
 
 // Get random user agent
 function getRandomUserAgent() {
@@ -44,7 +50,6 @@ const getGitInfo = () => {
     return new Promise((resolve) => {
         exec('git rev-parse --short HEAD && git log -1 --format=%cd --date=relative', (err, stdout) => {
             if (err) {
-                console.error('Error fetching git info:', err);
                 resolve({ commit: 'Unknown', date: 'Unknown' });
                 return;
             }
@@ -57,217 +62,230 @@ const getGitInfo = () => {
     });
 };
 
-// Create the proxy server
-const server = http.createServer((req, res) => {
-    // Handle CORS preflight requests
-    if (req.method === 'OPTIONS') {
-        handleCORS(res);
-        res.writeHead(200);
-        res.end();
-        return;
+if (cluster.isMaster) {
+    console.log(`Master ${process.pid} is running`);
+    console.log(`Spawning ${numCPUs} workers...`);
+
+    for (let i = 0; i < numCPUs; i++) {
+        cluster.fork();
     }
 
-    // Handle Git Info request
-    // Nginx proxy_pass might result in double slashes (//git-info)
-    if ((req.url === '/git-info' || req.url === '//git-info') && req.method === 'GET') {
-        handleCORS(res);
-        getGitInfo().then(info => {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(info));
-        });
-        return;
-    }
-
-    // Only allow POST requests to the proxy
-    if (req.method !== 'POST') {
-        res.writeHead(405, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Method not allowed. Use POST.' }));
-        return;
-    }
-
-    // Parse request body
-    let body = '';
-    req.on('data', chunk => {
-        body += chunk.toString();
+    cluster.on('exit', (worker, code, signal) => {
+        console.log(`Worker ${worker.process.pid} died. Respawning...`);
+        cluster.fork();
     });
 
-    req.on('end', () => {
-        try {
-            const proxyRequest = JSON.parse(body);
-            handleProxyRequest(proxyRequest, res);
-        } catch (error) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                error: 'Invalid JSON',
-                message: error.message
-            }));
+    // Master process only listens for SIGINT to gracefully shut down workers
+    process.on('SIGINT', () => {
+        console.log('\n\n🛑 Shutting down proxy server (master)...');
+        for (const id in cluster.workers) {
+            cluster.workers[id].kill();
         }
+        process.exit(0);
     });
-});
 
-// Handle the actual proxy request
-function handleProxyRequest(proxyRequest, clientRes) {
-    const { targetUrl, method = 'GET', headers = {}, body = null } = proxyRequest;
+} else {
+    // Create the proxy server
+    const server = http.createServer((req, res) => {
+        // Handle CORS preflight requests
+        if (req.method === 'OPTIONS') {
+            handleCORS(res);
+            res.writeHead(200);
+            res.end();
+            return;
+        }
 
-    // Validate target URL
-    if (!targetUrl) {
-        clientRes.writeHead(400, { 'Content-Type': 'application/json' });
-        clientRes.end(JSON.stringify({ error: 'targetUrl is required' }));
-        return;
-    }
+        // Health check
+        if (req.url === '/health' || req.url === '//health') {
+            handleCORS(res);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok', worker: process.pid }));
+            return;
+        }
 
-    let parsedUrl;
-    try {
-        parsedUrl = new URL(targetUrl);
-    } catch (error) {
-        clientRes.writeHead(400, { 'Content-Type': 'application/json' });
-        clientRes.end(JSON.stringify({ error: 'Invalid URL' }));
-        return;
-    }
+        // Handle Git Info request
+        // Nginx proxy_pass might result in double slashes (//git-info)
+        if ((req.url === '/git-info' || req.url === '//git-info') && req.method === 'GET') {
+            handleCORS(res);
+            getGitInfo().then(info => {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(info));
+            });
+            return;
+        }
 
-    // Determine if we need http or https
-    const protocol = parsedUrl.protocol === 'https:' ? https : http;
+        // Only allow POST requests to the proxy
+        if (req.method !== 'POST') {
+            res.writeHead(405, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Method not allowed. Use POST.' }));
+            return;
+        }
 
-    // Prepare request options with random user agent
-    const options = {
-        hostname: parsedUrl.hostname,
-        port: parsedUrl.port,
-        path: parsedUrl.pathname + parsedUrl.search,
-        method: method,
-        headers: {
-            ...headers,
-            'User-Agent': getRandomUserAgent(),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-        },
-        timeout: CONFIG.timeout
-    };
+        // Parse request body
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
 
-    const startTime = Date.now();
-
-    // Make the request to the target server
-    const proxyReq = protocol.request(options, (proxyRes) => {
-        const responseTime = Date.now() - startTime;
-
-        // Collect response data
-        let responseData = '';
-        let responseSize = 0;
-        const maxBodySize = 500000; // 500KB limit for crawler
-
-        proxyRes.on('data', chunk => {
-            responseSize += chunk.length;
-            // Only collect body if under size limit (for crawler)
-            if (responseSize < maxBodySize) {
-                responseData += chunk.toString();
+        req.on('end', () => {
+            try {
+                const proxyRequest = JSON.parse(body);
+                handleProxyRequest(proxyRequest, res);
+            } catch (error) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    error: 'Invalid JSON',
+                    message: error.message
+                }));
             }
         });
+    });
 
-        proxyRes.on('end', () => {
-            // Send response back to client with CORS headers
+    // Handle the actual proxy request
+    function handleProxyRequest(proxyRequest, clientRes) {
+        const { targetUrl, method = 'GET', headers = {}, body = null } = proxyRequest;
+
+        // Validate target URL
+        if (!targetUrl) {
+            clientRes.writeHead(400, { 'Content-Type': 'application/json' });
+            clientRes.end(JSON.stringify({ error: 'targetUrl is required' }));
+            return;
+        }
+
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(targetUrl);
+        } catch (error) {
+            clientRes.writeHead(400, { 'Content-Type': 'application/json' });
+            clientRes.end(JSON.stringify({ error: 'Invalid URL' }));
+            return;
+        }
+
+        // Determine if we need http or https and which agent to use
+        const isHttps = parsedUrl.protocol === 'https:';
+        const protocol = isHttps ? https : http;
+        const agent = isHttps ? httpsAgent : httpAgent;
+
+        // Prepare request options with random user agent
+        const options = {
+            hostname: parsedUrl.hostname,
+            port: parsedUrl.port,
+            path: parsedUrl.pathname + parsedUrl.search,
+            method: method,
+            agent: agent, // Use the global agent for connection pooling
+            headers: {
+                ...headers,
+                'User-Agent': getRandomUserAgent(),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            },
+            timeout: CONFIG.timeout
+        };
+
+        const startTime = Date.now();
+
+        // Make the request to the target server
+        const proxyReq = protocol.request(options, (proxyRes) => {
+            const responseTime = Date.now() - startTime;
+
+            // Collect response data
+            let responseData = '';
+            let responseSize = 0;
+            const maxBodySize = 500000; // 500KB limit for crawler
+
+            proxyRes.on('data', chunk => {
+                responseSize += chunk.length;
+                // Only collect body if under size limit (for crawler)
+                if (responseSize < maxBodySize) {
+                    responseData += chunk.toString();
+                }
+            });
+
+            proxyRes.on('end', () => {
+                // Send response back to client with CORS headers
+                handleCORS(clientRes);
+                clientRes.writeHead(200, { 'Content-Type': 'application/json' });
+
+                clientRes.end(JSON.stringify({
+                    success: true,
+                    statusCode: proxyRes.statusCode,
+                    statusMessage: proxyRes.statusMessage,
+                    responseTime: responseTime,
+                    headers: proxyRes.headers,
+                    body: responseData, // Full body for crawler link extraction
+                    bodySize: responseSize,
+                    proxyWorker: process.pid // Add worker ID for debugging
+                }));
+            });
+        });
+
+        // Handle request errors
+        proxyReq.on('error', (error) => {
+            const responseTime = Date.now() - startTime;
+
             handleCORS(clientRes);
             clientRes.writeHead(200, { 'Content-Type': 'application/json' });
 
             clientRes.end(JSON.stringify({
-                success: true,
-                statusCode: proxyRes.statusCode,
-                statusMessage: proxyRes.statusMessage,
+                success: false,
+                error: error.message,
                 responseTime: responseTime,
-                headers: proxyRes.headers,
-                body: responseData, // Full body for crawler link extraction
-                bodySize: responseSize
+                statusCode: 0
             }));
         });
-    });
 
-    // Handle request errors
-    proxyReq.on('error', (error) => {
-        const responseTime = Date.now() - startTime;
+        // Handle timeout
+        proxyReq.on('timeout', () => {
+            proxyReq.destroy();
+            const responseTime = Date.now() - startTime;
 
-        handleCORS(clientRes);
-        clientRes.writeHead(200, { 'Content-Type': 'application/json' });
+            handleCORS(clientRes);
+            clientRes.writeHead(200, { 'Content-Type': 'application/json' });
 
-        clientRes.end(JSON.stringify({
-            success: false,
-            error: error.message,
-            responseTime: responseTime,
-            statusCode: 0
-        }));
-    });
+            clientRes.end(JSON.stringify({
+                success: false,
+                error: 'Request timeout',
+                responseTime: responseTime,
+                statusCode: 0
+            }));
+        });
 
-    // Handle timeout
-    proxyReq.on('timeout', () => {
-        proxyReq.destroy();
-        const responseTime = Date.now() - startTime;
+        // Send request body if present
+        if (body && method !== 'GET' && method !== 'HEAD') {
+            proxyReq.write(typeof body === 'string' ? body : JSON.stringify(body));
+        }
 
-        handleCORS(clientRes);
-        clientRes.writeHead(200, { 'Content-Type': 'application/json' });
-
-        clientRes.end(JSON.stringify({
-            success: false,
-            error: 'Request timeout',
-            responseTime: responseTime,
-            statusCode: 0
-        }));
-    });
-
-    // Send request body if present
-    if (body && method !== 'GET' && method !== 'HEAD') {
-        proxyReq.write(typeof body === 'string' ? body : JSON.stringify(body));
+        proxyReq.end();
     }
 
-    proxyReq.end();
-}
+    // Add CORS headers to response
+    function handleCORS(res) {
+        res.setHeader('Access-Control-Allow-Origin', CONFIG.allowedOrigins);
+        res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
 
-// Add CORS headers to response
-function handleCORS(res) {
-    res.setHeader('Access-Control-Allow-Origin', CONFIG.allowedOrigins);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
-
-// Start the server
-server.listen(PORT, () => {
-    console.log(`
-╔════════════════════════════════════════════════════════════╗
-║         CORS Proxy Server for Stress Testing Tool         ║
-╚════════════════════════════════════════════════════════════╝
-
-✅ Server running on: http://localhost:${PORT}
-✅ Max connections: ${CONFIG.maxConnections}
-✅ Request timeout: ${CONFIG.timeout}ms
-
-📝 Usage:
-   POST to http://localhost:${PORT} with JSON body:
-   {
-     "targetUrl": "https://example.com",
-     "method": "GET",
-     "headers": {},
-     "body": null
-   }
-
-🔒 Security Note:
-   For production, update CONFIG.allowedOrigins to your
-   stress testing tool's domain (not '*')
-
-Press Ctrl+C to stop the server
-  `);
-});
-
-// Handle server errors
-server.on('error', (error) => {
-    console.error('❌ Server error:', error.message);
-    process.exit(1);
-});
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-    console.log('\n\n🛑 Shutting down proxy server...');
-    server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
+    // Start the server
+    server.listen(PORT, () => {
+        console.log(`Worker ${process.pid} running on http://localhost:${PORT}`);
     });
-});
+
+    // Handle server errors
+    server.on('error', (error) => {
+        console.error(`❌ Worker ${process.pid} server error:`, error.message);
+        process.exit(1);
+    });
+
+    // Graceful shutdown for workers
+    process.on('SIGINT', () => {
+        console.log(`\n\n🛑 Worker ${process.pid} shutting down...`);
+        server.close(() => {
+            console.log(`✅ Worker ${process.pid} closed`);
+            process.exit(0);
+        });
+    });
+}

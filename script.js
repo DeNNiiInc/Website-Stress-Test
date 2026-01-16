@@ -1,85 +1,4 @@
 // ===================================
-// STRESS TESTING TOOL - MAIN SCRIPT
-// Enhanced with Crawler & Advanced Features
-// ===================================
-
-// ===================================
-// WEBSITE CRAWLER CLASS
-// ===================================
-class WebsiteCrawler {
-  constructor() {
-    this.visitedUrls = new Set();
-    this.urlQueue = [];
-  }
-
-  extractLinks(html, baseUrl) {
-    const links = [];
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    const anchorTags = doc.querySelectorAll("a[href]");
-
-    const baseUrlObj = new URL(baseUrl);
-
-    anchorTags.forEach((anchor) => {
-      try {
-        const href = anchor.getAttribute("href");
-        if (
-          !href ||
-          href.startsWith("#") ||
-          href.startsWith("javascript:") ||
-          href.startsWith("mailto:")
-        ) {
-          return;
-        }
-
-        const absoluteUrl = new URL(href, baseUrl);
-
-        // Only include links from the same domain if configured
-        if (absoluteUrl.hostname === baseUrlObj.hostname) {
-          const urlString = absoluteUrl.href;
-          if (!this.visitedUrls.has(urlString)) {
-            links.push(urlString);
-          }
-        }
-      } catch (e) {
-        // Invalid URL, skip
-      }
-    });
-
-    return links;
-  }
-
-  getNextUrl(currentUrl, html, config) {
-    // Extract links from current page
-    const links = this.extractLinks(html, currentUrl);
-
-    // Add new links to queue (limit per page)
-    const linksToAdd = links.slice(0, config.linksPerPage || 10);
-    linksToAdd.forEach((link) => {
-      if (!this.visitedUrls.has(link) && this.urlQueue.length < 100) {
-        this.urlQueue.push(link);
-      }
-    });
-
-    // Mark current URL as visited
-    this.visitedUrls.add(currentUrl);
-
-    // Get next URL from queue
-    if (this.urlQueue.length > 0) {
-      const randomIndex = Math.floor(Math.random() * this.urlQueue.length);
-      return this.urlQueue.splice(randomIndex, 1)[0];
-    }
-
-    return null;
-  }
-
-  reset() {
-    this.visitedUrls.clear();
-    this.urlQueue = [];
-  }
-}
-
-// ===================================
 // UTILITY FUNCTIONS
 // ===================================
 function calculatePercentile(arr, percentile) {
@@ -120,8 +39,8 @@ class StressTestingTool {
       thinkTime: 1000,
       proxyUrl:
         window.location.protocol === "file:" ||
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1"
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1"
           ? "http://localhost:3000"
           : "/proxy",
 
@@ -143,11 +62,13 @@ class StressTestingTool {
       failedRequests: 0,
       responseTimes: [],
       requestsPerSecond: [],
-      workers: [],
+      workers: [], // Web Worker instances
+      workerStats: new Map(), // Stats per worker
       updateInterval: null,
       chartUpdateInterval: null,
       userErrorData: [],
       errorThreshold: null,
+      lastUiUpdate: 0,
 
       // Enhanced metrics
       errorsByCategory: {
@@ -168,7 +89,6 @@ class StressTestingTool {
       },
     };
 
-    this.crawler = new WebsiteCrawler();
     this.charts = {
       rps: null,
       responseTime: null,
@@ -471,9 +391,9 @@ class StressTestingTool {
             let dateStr = data.date;
             // Shorten to match screenshot style (approximate)
             dateStr = dateStr.replace(/ days? ago/, 'd ago')
-                           .replace(/ hours? ago/, 'h ago')
-                           .replace(/ minutes? ago/, 'm ago')
-                           .replace(/ seconds? ago/, 's ago');
+              .replace(/ hours? ago/, 'h ago')
+              .replace(/ minutes? ago/, 'm ago')
+              .replace(/ seconds? ago/, 's ago');
             this.elements.gitDate.textContent = dateStr;
           }
           if (this.elements.gitInfo) this.elements.gitInfo.style.display = 'flex';
@@ -880,223 +800,85 @@ class StressTestingTool {
   }
 
   startWorkers() {
-    const pattern = this.config.trafficPattern;
+    const totalUsers = this.config.userCount;
+    const workerCount = Math.min(Math.ceil(totalUsers / 100), navigator.hardwareConcurrency || 4);
+    const usersPerWorker = Math.ceil(totalUsers / workerCount);
 
-    switch (pattern) {
-      case "steady":
-        this.startSteadyLoad();
-        break;
-      case "burst":
-        this.startBurstLoad();
-        break;
-      case "rampup":
-        this.startRampUpLoad();
-        break;
-      case "random":
-        this.startRandomLoad();
-        break;
-    }
-  }
+    for (let i = 0; i < workerCount; i++) {
+      const worker = new Worker('worker.js');
+      const startUser = i * usersPerWorker;
+      const endUser = Math.min((i + 1) * usersPerWorker, totalUsers);
+      const workerUsers = Array.from({ length: endUser - startUser }, (_, j) => startUser + j);
 
-  startSteadyLoad() {
-    const delayBetweenUsers = 100;
+      worker.onmessage = (e) => this.handleWorkerMessage(i, e.data);
 
-    for (let i = 0; i < this.config.userCount; i++) {
-      setTimeout(() => {
-        if (this.state.status === "running") {
-          this.createWorker(i);
-        }
-      }, i * delayBetweenUsers);
-    }
-  }
-
-  startBurstLoad() {
-    const burstSize = Math.ceil(this.config.userCount / 5);
-    const burstInterval = (this.config.duration * 1000) / 5;
-
-    for (let burst = 0; burst < 5; burst++) {
-      setTimeout(() => {
-        if (this.state.status === "running") {
-          for (let i = 0; i < burstSize; i++) {
-            this.createWorker(burst * burstSize + i);
-          }
-        }
-      }, burst * burstInterval);
-    }
-  }
-
-  startRampUpLoad() {
-    const totalTime = this.config.duration * 1000;
-    const timePerUser = totalTime / this.config.userCount;
-
-    for (let i = 0; i < this.config.userCount; i++) {
-      setTimeout(() => {
-        if (this.state.status === "running") {
-          this.createWorker(i);
-        }
-      }, i * timePerUser);
-    }
-  }
-
-  startRandomLoad() {
-    const maxDelay = (this.config.duration * 1000) / 2;
-
-    for (let i = 0; i < this.config.userCount; i++) {
-      const randomDelay = Math.random() * maxDelay;
-      setTimeout(() => {
-        if (this.state.status === "running") {
-          this.createWorker(i);
-        }
-      }, randomDelay);
-    }
-  }
-
-  createWorker(id) {
-    const worker = {
-      id: id,
-      active: true,
-      requestCount: 0,
-      currentUrl: this.config.targetUrl,
-      crawlDepth: 0,
-    };
-
-    this.state.workers.push(worker);
-    this.state.activeUsers++;
-    this.runWorker(worker);
-  }
-
-  async runWorker(worker) {
-    const endTime = this.state.startTime + this.config.duration * 1000;
-
-    while (
-      worker.active &&
-      this.state.status === "running" &&
-      Date.now() < endTime
-    ) {
-      await this.makeRequest(worker);
-
-      // Think time
-      if (this.config.thinkTime > 0) {
-        await this.sleep(this.config.thinkTime);
-      }
-    }
-
-    // Worker finished
-    worker.active = false;
-    this.state.activeUsers--;
-
-    // Check if all workers are done
-    if (this.state.activeUsers === 0 && this.state.status === "running") {
-      this.stopTest();
-    }
-  }
-
-  async makeRequest(worker) {
-    const startTime = performance.now();
-    const requestUrl = worker.currentUrl;
-
-    try {
-      const proxyPayload = {
-        targetUrl: requestUrl,
-        method: this.config.httpMethod,
-        headers: this.config.customHeaders,
-        body: this.config.requestBody,
-      };
-
-      // Estimate request size
-      const requestSize = JSON.stringify(proxyPayload).length;
-      this.state.totalBytesSent += requestSize;
-
-      const response = await fetch(this.config.proxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(proxyPayload),
+      worker.postMessage({
+        type: 'INIT',
+        data: { config: this.config }
       });
 
-      const endTime = performance.now();
-      const responseTime = endTime - startTime;
-
-      this.state.totalRequests++;
-      worker.requestCount++;
-
-      const proxyResponse = await response.json();
-
-      // Track response size
-      if (proxyResponse.body) {
-        this.state.totalBytesReceived += proxyResponse.body.length;
-      }
-
-      const isSuccess =
-        proxyResponse.success &&
-        proxyResponse.statusCode >= 200 &&
-        proxyResponse.statusCode < 400;
-
-      if (isSuccess) {
-        this.state.successfulRequests++;
-      } else {
-        this.state.failedRequests++;
-        const category = categorizeError(
-          proxyResponse.statusCode,
-          proxyResponse.error
-        );
-        this.state.errorsByCategory[category]++;
-      }
-
-      const actualResponseTime = proxyResponse.responseTime || responseTime;
-      this.state.responseTimes.push(actualResponseTime);
-
-      // Keep only last 1000 response times
-      if (this.state.responseTimes.length > 1000) {
-        this.state.responseTimes.shift();
-      }
-
-      // Add to request history
-      this.addToRequestHistory({
-        url: requestUrl,
-        status: proxyResponse.statusCode,
-        responseTime: Math.round(actualResponseTime),
-        success: isSuccess,
-        timestamp: new Date().toLocaleTimeString(),
+      worker.postMessage({
+        type: 'START',
+        data: { users: workerUsers }
       });
 
-      // Crawler: Get next URL if enabled
-      if (
-        this.config.crawlerEnabled &&
-        isSuccess &&
-        proxyResponse.body &&
-        worker.crawlDepth < this.config.crawlDepth
-      ) {
-        const nextUrl = this.crawler.getNextUrl(
-          requestUrl,
-          proxyResponse.body,
-          this.config
-        );
-        if (nextUrl) {
-          worker.currentUrl = nextUrl;
-          worker.crawlDepth++;
-        }
-      }
-    } catch (error) {
-      const endTime = performance.now();
-      const responseTime = endTime - startTime;
-
-      this.state.totalRequests++;
-      this.state.failedRequests++;
-      this.state.responseTimes.push(responseTime);
-      this.state.errorsByCategory["network"]++;
-      worker.requestCount++;
-
-      this.addToRequestHistory({
-        url: requestUrl,
-        status: 0,
-        responseTime: Math.round(responseTime),
-        success: false,
-        timestamp: new Date().toLocaleTimeString(),
-        error: error.message,
+      this.state.workers.push(worker);
+      this.state.workerStats.set(i, {
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        bytesSent: 0,
+        bytesReceived: 0,
+        errorsByCategory: { "4xx": 0, "5xx": 0, "timeout": 0, "network": 0 },
+        responseTimes: []
       });
     }
+
+    this.state.activeUsers = totalUsers;
+  }
+
+  handleWorkerMessage(workerId, message) {
+    if (message.type === 'STATS') {
+      this.state.workerStats.set(workerId, message.data);
+      this.aggregateStats();
+    } else if (message.type === 'LOG') {
+      this.addToRequestHistory(message.data);
+    }
+  }
+
+  aggregateStats() {
+    let totalRequests = 0;
+    let successfulRequests = 0;
+    let failedRequests = 0;
+    let bytesSent = 0;
+    let bytesReceived = 0;
+    let errors = { "4xx": 0, "5xx": 0, "timeout": 0, "network": 0 };
+    let allResponseTimes = [];
+
+    for (const stats of this.state.workerStats.values()) {
+      totalRequests += stats.totalRequests;
+      successfulRequests += stats.successfulRequests;
+      failedRequests += stats.failedRequests;
+      bytesSent += stats.bytesSent;
+      bytesReceived += stats.bytesReceived;
+
+      errors["4xx"] += stats.errorsByCategory["4xx"];
+      errors["5xx"] += stats.errorsByCategory["5xx"];
+      errors["timeout"] += stats.errorsByCategory["timeout"];
+      errors["network"] += stats.errorsByCategory["network"];
+
+      if (stats.responseTimes) {
+        allResponseTimes = allResponseTimes.concat(stats.responseTimes);
+      }
+    }
+
+    this.state.totalRequests = totalRequests;
+    this.state.successfulRequests = successfulRequests;
+    this.state.failedRequests = failedRequests;
+    this.state.totalBytesSent = bytesSent;
+    this.state.totalBytesReceived = bytesReceived;
+    this.state.errorsByCategory = errors;
+    this.state.responseTimes = allResponseTimes.slice(-1000); // Sample for percentiles
   }
 
   addToRequestHistory(request) {
@@ -1113,25 +895,16 @@ class StressTestingTool {
       row.className = request.success ? "success-row" : "error-row";
       row.innerHTML = `
         <td>${request.timestamp}</td>
-        <td class="url-cell" title="${request.url}">${this.truncateUrl(
-        request.url
-      )}</td>
-        <td><span class="status-code ${
-          request.success ? "success" : "error"
-        }">${request.status}</span></td>
+        <td class="url-cell" title="${request.url}">${this.truncateUrl(request.url)}</td>
+        <td><span class="status-code ${request.success ? "success" : "error"}">${request.status}</span></td>
         <td>${request.responseTime}ms</td>
       `;
 
-      this.elements.requestHistoryBody.insertBefore(
-        row,
-        this.elements.requestHistoryBody.firstChild
-      );
+      this.elements.requestHistoryBody.insertBefore(row, this.elements.requestHistoryBody.firstChild);
 
       // Keep only 100 rows in DOM
       while (this.elements.requestHistoryBody.children.length > 100) {
-        this.elements.requestHistoryBody.removeChild(
-          this.elements.requestHistoryBody.lastChild
-        );
+        this.elements.requestHistoryBody.removeChild(this.elements.requestHistoryBody.lastChild);
       }
     }
   }
@@ -1145,8 +918,10 @@ class StressTestingTool {
 
   stopWorkers() {
     this.state.workers.forEach((worker) => {
-      worker.active = false;
+      worker.terminate();
     });
+    this.state.workers = [];
+    this.state.workerStats.clear();
   }
 
   calculatePercentiles() {
@@ -1165,6 +940,13 @@ class StressTestingTool {
 
   updateStatistics() {
     const now = Date.now();
+
+    // Check if enough time has passed for a UI update (1000ms throttled)
+    if (this.state.status === "running" && now - this.state.lastUiUpdate < 1000) {
+      return;
+    }
+    this.state.lastUiUpdate = now;
+
     const elapsed = Math.floor((now - this.state.startTime) / 1000);
     const remaining = Math.max(0, this.config.duration - elapsed);
     const progress = Math.min(100, (elapsed / this.config.duration) * 100);
@@ -1190,9 +972,9 @@ class StressTestingTool {
     const successRate =
       this.state.totalRequests > 0
         ? (
-            (this.state.successfulRequests / this.state.totalRequests) *
-            100
-          ).toFixed(1)
+          (this.state.successfulRequests / this.state.totalRequests) *
+          100
+        ).toFixed(1)
         : 0;
     this.elements.successRate.textContent = `${successRate}%`;
 
@@ -1200,9 +982,9 @@ class StressTestingTool {
     const avgResponseTime =
       this.state.responseTimes.length > 0
         ? Math.round(
-            this.state.responseTimes.reduce((a, b) => a + b, 0) /
-              this.state.responseTimes.length
-          )
+          this.state.responseTimes.reduce((a, b) => a + b, 0) /
+          this.state.responseTimes.length
+        )
         : 0;
     this.elements.avgResponseTime.textContent = `${avgResponseTime}ms`;
 
@@ -1248,9 +1030,9 @@ class StressTestingTool {
     const currentAvgResponseTime =
       recentResponseTimes.length > 0
         ? Math.round(
-            recentResponseTimes.reduce((a, b) => a + b, 0) /
-              recentResponseTimes.length
-          )
+          recentResponseTimes.reduce((a, b) => a + b, 0) /
+          recentResponseTimes.length
+        )
         : 0;
 
     // Update RPS chart
@@ -1279,9 +1061,9 @@ class StressTestingTool {
     const currentErrorRate =
       this.state.totalRequests > 0
         ? (
-            (this.state.failedRequests / this.state.totalRequests) *
-            100
-          ).toFixed(1)
+          (this.state.failedRequests / this.state.totalRequests) *
+          100
+        ).toFixed(1)
         : 0;
 
     // Update User/Error chart
@@ -1375,17 +1157,17 @@ class StressTestingTool {
     const successRate =
       this.state.totalRequests > 0
         ? (
-            (this.state.successfulRequests / this.state.totalRequests) *
-            100
-          ).toFixed(2)
+          (this.state.successfulRequests / this.state.totalRequests) *
+          100
+        ).toFixed(2)
         : 0;
 
     const avgResponseTime =
       this.state.responseTimes.length > 0
         ? Math.round(
-            this.state.responseTimes.reduce((a, b) => a + b, 0) /
-              this.state.responseTimes.length
-          )
+          this.state.responseTimes.reduce((a, b) => a + b, 0) /
+          this.state.responseTimes.length
+        )
         : 0;
 
     const minResponseTime =
