@@ -160,6 +160,21 @@
               >
             </div>
 
+            <!-- Full Page Simulation -->
+            <div class="form-group crawler-section">
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  id="simulateAssets"
+                  class="form-checkbox"
+                />
+                <span>🖼️ Full Page Simulation (Load Images/CSS/JS)</span>
+              </label>
+              <small class="help-text"
+                >Calculates realistic "Total Page Load Time" by fetching assets</small
+              >
+            </div>
+
             <!-- Crawler Settings (shown when enabled) -->
             <div
               class="crawler-settings"
@@ -395,6 +410,21 @@
             <div class="stat-card">
               <div class="stat-label">Network Errors</div>
               <div class="stat-value danger" id="errorsNetwork">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Real World Performance -->
+        <div class="panel-section mt-4" id="pageLoadSection" style="display: none">
+          <h3 class="section-title">Real World Performance</h3>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Avg. Page Load Time</div>
+              <div class="stat-value info" id="avgPageLoadTime">0ms</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Asset Requests</div>
+              <div class="stat-value" id="totalAssetRequests">0</div>
             </div>
           </div>
         </div>

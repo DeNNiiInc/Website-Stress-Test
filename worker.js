@@ -14,6 +14,8 @@ let state = {
     responseTimes: [],
     bytesSent: 0,
     bytesReceived: 0,
+    pageLoadTimes: [],
+    totalAssetRequests: 0,
     errorsByCategory: {
         "4xx": 0,
         "5xx": 0,
@@ -89,7 +91,21 @@ async function runUser(id) {
     let crawlDepth = 0;
 
     while (state.active && Date.now() < endTime) {
+        const pageLoadStart = performance.now();
         const result = await makeRequest(currentUrl);
+        let totalPageTime = result.responseTime;
+
+        // asset simulation
+        if (config.simulateAssets && result.success && result.body) {
+            const assets = extractAssets(result.body, currentUrl);
+            if (assets.length > 0) {
+                const assetResults = await fetchAssetsThrottled(assets);
+                const pageLoadEnd = performance.now();
+                totalPageTime = pageLoadEnd - pageLoadStart;
+                state.pageLoadTimes.push(totalPageTime);
+                state.totalAssetRequests += assets.length;
+            }
+        }
 
         // Report individual request for history log (sampled)
         if (Math.random() < 0.1 || config.userCount < 50) {
@@ -234,4 +250,69 @@ function extractRandomLink(html, baseUrl) {
         }
     } catch (e) { }
     return null;
+}
+
+function extractAssets(html, baseUrl) {
+    const assets = [];
+    try {
+        // Regex for scripts, links (css), and images
+        const scriptRegex = /<script\b[^>]*src=["']([^"']+)["'][^>]*>/gi;
+        const linkRegex = /<link\b[^>]*href=["']([^"']+)["'][^>]*>/gi;
+        const imgRegex = /<img\b[^>]*src=["']([^"']+)["'][^>]*>/gi;
+
+        const extract = (regex) => {
+            let match;
+            while ((match = regex.exec(html)) !== null) {
+                try {
+                    const url = new URL(match[1], baseUrl).href;
+                    assets.push(url);
+                } catch (e) { }
+                if (assets.length > 20) break; // Limit per page for performance
+            }
+        };
+
+        extract(scriptRegex);
+        extract(linkRegex);
+        extract(imgRegex);
+    } catch (e) { }
+    return assets;
+}
+
+async function fetchAssetsThrottled(assets) {
+    const limit = 6; // Max concurrent connections like a browser
+    const results = [];
+
+    for (let i = 0; i < assets.length; i += limit) {
+        const batch = assets.slice(i, i + limit);
+        const promises = batch.map(url => fetchAsset(url));
+        results.push(...(await Promise.all(promises)));
+        if (!state.active) break;
+    }
+    return results;
+}
+
+async function fetchAsset(url) {
+    try {
+        const payload = JSON.stringify({
+            targetUrl: url,
+            method: 'GET',
+            headers: config.customHeaders
+        });
+
+        state.bytesSent += payload.length;
+
+        const response = await fetch(config.proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload
+        });
+
+        const data = await response.json();
+        if (data.body) {
+            state.bytesReceived += data.body.length;
+        }
+        return data.success;
+    } catch (e) {
+        return false;
+    }
 }

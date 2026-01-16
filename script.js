@@ -62,6 +62,8 @@ class StressTestingTool {
       requestsPerSecond: [],
       workers: [], // Web Worker instances
       workerStats: new Map(), // Stats per worker
+      pageLoadTimes: [], // All page load times for percentiles
+      totalAssetRequests: 0,
       updateInterval: null,
       chartUpdateInterval: null,
       userErrorData: [],
@@ -163,6 +165,12 @@ class StressTestingTool {
       errorsTimeout: document.getElementById("errorsTimeout"),
       errorsNetwork: document.getElementById("errorsNetwork"),
       totalBandwidth: document.getElementById("totalBandwidth"),
+
+      // Page Load Simulation
+      simulateAssets: document.getElementById("simulateAssets"),
+      pageLoadSection: document.getElementById("pageLoadSection"),
+      avgPageLoadTime: document.getElementById("avgPageLoadTime"),
+      totalAssetRequests: document.getElementById("totalAssetRequests"),
 
       // Request history
       requestHistoryBody: document.getElementById("requestHistoryBody"),
@@ -747,6 +755,8 @@ class StressTestingTool {
         this.elements.linksPerPage?.value || 10
       );
     }
+
+    this.config.simulateAssets = this.elements.simulateAssets?.checked || false;
   }
 
   resetState() {
@@ -768,6 +778,8 @@ class StressTestingTool {
     };
     this.state.totalBytesSent = 0;
     this.state.totalBytesReceived = 0;
+    this.state.pageLoadTimes = [];
+    this.state.totalAssetRequests = 0;
     this.state.requestHistory = [];
     this.state.percentiles = { p50: 0, p95: 0, p99: 0 };
 
@@ -876,6 +888,20 @@ class StressTestingTool {
     this.state.totalBytesReceived = bytesReceived;
     this.state.errorsByCategory = errors;
     this.state.responseTimes = allResponseTimes.slice(-1000); // Sample for percentiles
+
+    // Aggregate page load times and assets
+    let totalAssets = 0;
+    let newPageLoadTimes = [];
+    for (const stats of this.state.workerStats.values()) {
+      totalAssets += stats.totalAssetRequests || 0;
+      if (stats.pageLoadTimes && stats.pageLoadTimes.length > 0) {
+        newPageLoadTimes = newPageLoadTimes.concat(stats.pageLoadTimes);
+      }
+    }
+    this.state.totalAssetRequests = totalAssets;
+    if (newPageLoadTimes.length > 0) {
+      this.state.pageLoadTimes = this.state.pageLoadTimes.concat(newPageLoadTimes).slice(-1000);
+    }
   }
 
   addToRequestHistory(request) {
@@ -1009,6 +1035,19 @@ class StressTestingTool {
       const totalBytes =
         this.state.totalBytesSent + this.state.totalBytesReceived;
       this.elements.totalBandwidth.textContent = formatBytes(totalBytes);
+    }
+
+    // Update simulation metrics
+    if (this.config.simulateAssets) {
+      this.elements.pageLoadSection.style.display = 'block';
+      this.elements.totalAssetRequests.textContent = this.state.totalAssetRequests.toLocaleString();
+
+      const avgPageLoad = this.state.pageLoadTimes.length > 0
+        ? Math.round(this.state.pageLoadTimes.reduce((a, b) => a + b, 0) / this.state.pageLoadTimes.length)
+        : 0;
+      this.elements.avgPageLoadTime.textContent = `${avgPageLoad}ms`;
+    } else {
+      this.elements.pageLoadSection.style.display = 'none';
     }
   }
 
@@ -1211,7 +1250,16 @@ class StressTestingTool {
       "Error Threshold": this.state.errorThreshold
         ? `${this.state.errorThreshold.users} users at ${this.state.errorThreshold.time}s (${this.state.errorThreshold.errorRate}% error rate)`
         : "No errors detected",
+      "Full Page Simulation": this.config.simulateAssets ? "Enabled" : "Disabled",
     };
+
+    if (this.config.simulateAssets) {
+      const avgPageLoad = this.state.pageLoadTimes.length > 0
+        ? Math.round(this.state.pageLoadTimes.reduce((a, b) => a + b, 0) / this.state.pageLoadTimes.length)
+        : 0;
+      results["Average Page Load Time"] = `${avgPageLoad}ms`;
+      results["Total Asset Requests"] = this.state.totalAssetRequests.toLocaleString();
+    }
 
     if (this.config.crawlerEnabled) {
       results["Unique URLs Visited"] = this.state.visitedUrls.size;
