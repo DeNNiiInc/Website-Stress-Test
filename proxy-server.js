@@ -118,33 +118,59 @@ if (cluster.isMaster) {
         }
 
         // Serve static files for the UI
-        if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html' || req.url === '/script.js' || req.url.startsWith('/script.js?') || req.url === '/styles.css' || req.url === '/worker.js')) {
+        if (req.method === 'GET') {
             let requestPath = req.url.split('?')[0];
             let filePath = '.' + requestPath;
             if (requestPath === '/') filePath = './index.html';
 
-            const extname = path.extname(filePath);
-            let contentType = 'text/html';
-            switch (extname) {
-                case '.js': contentType = 'text/javascript'; break;
-                case '.css': contentType = 'text/css'; break;
+            // Basic security: don't allow accessing files outside the directory or sensitive files
+            const resolvedPath = path.resolve(filePath);
+            const rootPath = path.resolve('.');
+
+            if (!resolvedPath.startsWith(rootPath) || filePath.includes('..')) {
+                res.writeHead(403);
+                res.end('Forbidden');
+                return;
             }
 
-            fs.readFile(filePath, (error, content) => {
-                if (error) {
-                    if (error.code == 'ENOENT') {
-                        res.writeHead(404);
-                        res.end('File not found');
-                    } else {
-                        res.writeHead(500);
-                        res.end('Error loading file: ' + error.code);
-                    }
+            fs.access(filePath, fs.constants.F_OK, (err) => {
+                if (!err) {
+                    const extname = path.extname(filePath).toLowerCase();
+                    let contentType = 'text/html';
+                    const mimeTypes = {
+                        '.js': 'text/javascript',
+                        '.css': 'text/css',
+                        '.png': 'image/png',
+                        '.jpg': 'image/jpeg',
+                        '.svg': 'image/svg+xml',
+                        '.json': 'application/json'
+                    };
+                    contentType = mimeTypes[extname] || 'text/plain';
+
+                    fs.readFile(filePath, (error, content) => {
+                        if (!error) {
+                            res.writeHead(200, { 'Content-Type': contentType });
+                            res.end(content, 'utf-8');
+                        } else {
+                            res.writeHead(500);
+                            res.end('Server Error');
+                        }
+                    });
+                } else if (req.url === '/health' || req.url === '//health' || (req.url === '/git-info' || req.url === '//git-info')) {
+                    // Handled by other logic (keep going)
+                } else if (req.url === '/') {
+                    // Fallback for root if index.html doesn't exist? (Unlikely)
                 } else {
-                    res.writeHead(200, { 'Content-Type': contentType });
-                    res.end(content, 'utf-8');
+                    // Not a static file, maybe fall through to POST check
                 }
             });
-            return;
+
+            // Special handling for health and git-info which are GET but not files
+            if (req.url.includes('/health') || req.url.includes('/git-info')) {
+                // Let it fall through to those handlers
+            } else {
+                return;
+            }
         }
 
         // Only allow POST requests to the proxy

@@ -38,11 +38,9 @@ class StressTestingTool {
       requestBody: null,
       thinkTime: 1000,
       proxyUrl:
-        window.location.protocol === "file:" ||
-          window.location.hostname === "localhost" ||
-          window.location.hostname === "127.0.0.1"
-          ? "http://localhost:3000"
-          : "/proxy",
+        window.location.protocol.startsWith('http')
+          ? window.location.origin
+          : "http://localhost:3000",
 
       // Crawler settings
       crawlerEnabled: false,
